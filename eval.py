@@ -48,7 +48,8 @@ def eval(config):
         model = unet.UNet(num_classes=config['num_classes'])
 
     # 加载模型的检查点文件
-    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx.pth')
+    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth')
+    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_best.pth')
     # 定义数据归一化的转换操作
     transform = transforms.Compose(
         [

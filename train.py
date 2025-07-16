@@ -6,6 +6,7 @@ from tqdm import tqdm
 from utils import unet_dataset
 from models import unetFEGcn,unet
 from metrics import eval_metrics
+from utils.losses import CustomNDVILoss  # 导入自定义损失函数
 # from predict import predict
 # from lr_schedule import step_lr, exp_lr_scheduler
 
@@ -38,8 +39,8 @@ def train(config):
     # 初始化日志记录器
     logger = initLogger(selected)
 
-    # 定义损失函数为交叉熵损失
-    criterion = nn.CrossEntropyLoss()
+    # 定义自定义损失函数
+    criterion = CustomNDVILoss(alpha=2.0)  # 可以调整 alpha 值
 
     # 训练数据处理
     # 定义数据归一化的转换操作
@@ -79,7 +80,6 @@ def train(config):
         # 记录每个 epoch 的开始时间
         epoch_start = time.time()
         # lr
-        
 
         # 将模型设置为训练模式
         model.train()
@@ -103,17 +103,17 @@ def train(config):
         # 初始化训练集的混淆矩阵
         conf_matrix_train = np.zeros((config['num_classes'],config['num_classes']))
 
-        for batch_idx, (data, target,path) in enumerate(tbar):
+        for batch_idx, (data, target, path) in enumerate(tbar):
             # 记录每个批次的开始时间
             tic = time.time()
 
-            # data, target = data.to(device), target.to(device)
+            data, target = data.to(device), target.to(device)
             # 清空优化器的梯度
             optimizer.zero_grad()
             # 前向传播，得到模型的输出
             output = model(data)
             # 计算损失
-            loss = criterion(output, target)
+            loss = criterion(output, target, data)  # 使用自定义损失函数
             # 累加损失
             loss_sum += loss.item()
             # 反向传播，计算梯度
@@ -147,12 +147,11 @@ def train(config):
         logger.info('TRAIN ({}) | Loss: {:.5f} | OA {:.5f} IOU {}  mIoU {:.5f} '.format(
             epoch, loss_sum / ((batch_idx + 1) * config['batch_size']),
             pixelAcc, toString(IoU), IoU.mean()))
-        
 
         # 验证阶段
         # 记录验证阶段的开始时间
         test_start = time.time()
-        
+
         # 将模型设置为评估模式
         model.eval()
         # 初始化验证集的损失总和
@@ -178,19 +177,19 @@ def train(config):
         # 初始化每一类的 F1 分数
         class_f1=np.zeros(config['num_classes'])
         # val_list=[]
-        
-                # data, target = data.to(device), target.to(device)
+
         with torch.no_grad():
             # 初始化验证集的混淆矩阵
             conf_matrix_val = np.zeros((config['num_classes'],config['num_classes']))
-            for batch_idx, (data, target,path) in enumerate(tbar):
+            for batch_idx, (data, target, path) in enumerate(tbar):
                 # 记录每个验证批次的开始时间
                 tic = time.time()
-                
+
+                data, target = data.to(device), target.to(device)
                 # 前向传播，得到模型的输出
                 output = model(data)
                 # 计算损失
-                loss = criterion(output, target)
+                loss = criterion(output, target, data)  # 使用自定义损失函数
                 # 累加验证集的损失
                 loss_sum += loss.item()
 
@@ -221,7 +220,7 @@ def train(config):
                 tbar.set_description('VAL ({}) | Loss: {:.5f} | Acc {:.5f} mIoU {:.5f} | bt {:.2f} et {:.2f}|'.format(
                     epoch, loss_sum / ((batch_idx + 1) * config['batch_size']),
                     pixelAcc, mIoU.mean(),
-                            time.time() - tic, time.time() - test_start))
+                    time.time() - tic, time.time() - test_start))
             if loss_sum < val_min_loss:
                 # 更新最小验证损失
                 val_min_loss = loss_sum
@@ -233,11 +232,15 @@ def train(config):
                 if os.path.exists(config['save_model']['save_path']) is False:
                     os.mkdir(config['save_model']['save_path'])
                 # 保存模型的状态字典
-                torch.save(model.state_dict(), os.path.join(config['save_model']['save_path'], selected+'_jx.pth'))
+                torch.save(model.state_dict(), os.path.join(config['save_model']['save_path'], selected+'_jx_best.pth'))
                 # 保存验证集的混淆矩阵
                 np.savetxt(os.path.join(config['save_model']['save_path'],  selected+'_conf_matrix_val.txt'),conf_matrix_val,fmt="%d")
                 # 保存最佳 epoch 的信息
                 np.savetxt(os.path.join(config['save_model']['save_path'], selected+'_best_epoch.txt'),best_epoch)
+            
+            # 保存最后一次的模型
+            torch.save(model.state_dict(), os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth'))
+            np.savetxt(os.path.join(config['save_model']['save_path'], selected + '_conf_matrix_val_last.txt'), conf_matrix_val, fmt="%d")
         # 记录验证集的日志信息
         logger.info('VAL ({}) | Loss: {:.5f} | OA {:.5f} |IOU {} |mIoU {:.5f} |class_precision {}| class_recall {} | class_f1 {}|'.format(
             epoch, loss_sum / ((batch_idx + 1) * config['batch_size']),
