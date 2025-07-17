@@ -50,3 +50,18 @@ def eval_metrics(output, target, num_classes, conf_matrix):
 
     # 返回计算得到的正确像素数量、有标签像素数量、每个类别的交集面积、每个类别的并集面积以及更新后的混淆矩阵
     return correct, labeld, inter, union, conf_matrix
+
+def calculate_macro_f1(class_f1, num_classes):
+    """
+    计算Macro-F1，将nan值视为0
+    参数:
+        class_f1: 各类别的F1分数数组
+        num_classes: 类别总数
+    返回:
+        macro_f1: 计算得到的Macro-F1值
+    """
+    # 将nan值替换为0
+    valid_f1 = np.nan_to_num(class_f1, nan=0.0)
+    # 计算平均值
+    macro_f1 = np.sum(valid_f1) / num_classes
+    return macro_f1

@@ -5,16 +5,13 @@ import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms
-from models import unetFEGcn,unet
+from models import unetFEGcn,unet,utransform
 from utils.unet_dataset import read_tiff
 from osgeo import gdal
-from metrics import eval_metrics
+from metrics import eval_metrics,calculate_macro_f1
 from train import toString
-import os
-from metrics import eval_metrics
-import numpy as np
-import torch
-from torchvision import transforms
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # 读取标签文件的函数
 def read_label(filename):
@@ -46,10 +43,13 @@ def eval(config):
     elif selected == 'unet':
         # 初始化UNet模型，并指定类别数量
         model = unet.UNet(num_classes=config['num_classes'])
+    elif selected == 'umamba':
+        # 初始化 UMamba 模型
+        model = utransform.UTransform(num_classes=config['num_classes'])
 
     # 加载模型的检查点文件
     check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth')
-    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_best.pth')
+    # check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_best.pth')
     # 定义数据归一化的转换操作
     transform = transforms.Compose(
         [
@@ -142,15 +142,26 @@ def eval(config):
                 class_recall[i] = 1.0 * conf_matrix_test[i, i] / conf_matrix_test[i].sum()
                 # 每一类的F1分数
                 class_f1[i] = (2.0 * class_precision[i] * class_recall[i]) / (class_precision[i] + class_recall[i])
+            
+            macro_f1 = calculate_macro_f1(class_f1, config['num_classes'])
 
-    # 打印评估指标，包括总体准确率、交并比、平均交并比、每一类的精确率、召回率和F1分数
-    print('OA {:.5f} |IOU {} |mIoU {:.5f} |class_precision {}| class_recall {} | class_f1 {}|'.format(
-        pixelAcc, toString(mIoU), mIoU.mean(), toString(class_precision), toString(class_recall), toString(class_f1)))
+    # 打印评估指标
+    print('OA {:.5f} |IOU {} |mIoU {:.5f} |Macro-F1 {:.5f} |class_precision {}| class_recall {} | class_f1 {}|'.format(
+        pixelAcc, toString(mIoU), mIoU.mean(), macro_f1, toString(class_precision), toString(class_recall), toString(class_f1)))
     # 创建混淆矩阵文件夹（如果不存在）
     if not os.path.exists("confuse_matrix"):
         os.makedirs("confuse_matrix")
     # 将测试集的混淆矩阵保存为文本文件
     np.savetxt(os.path.join("confuse_matrix", selected + '_jx_matrix_test.txt'), conf_matrix_test, fmt="%d")
+
+    # 可视化混淆矩阵
+    plt.figure(figsize=(12, 10))  # 调整图像大小
+    sns.heatmap(conf_matrix_test, annot=True, fmt='.0f', cmap='Blues')
+    plt.xlabel('Predicted labels')
+    plt.ylabel('True labels')
+    plt.title('Confusion Matrix')
+    plt.savefig(os.path.join("confuse_matrix", selected + '_jx_matrix_test.png'), dpi=300)
+    plt.show()
 
 if __name__ == "__main__":
     # 打开评估配置文件

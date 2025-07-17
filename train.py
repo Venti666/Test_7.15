@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 
 from utils import unet_dataset
-from models import unetFEGcn,unet
+from models import unetFEGcn,unet,utransform
 from metrics import eval_metrics
 from utils.losses import CustomNDVILoss  # 导入自定义损失函数
 # from predict import predict
@@ -32,6 +32,9 @@ def train(config):
     elif selected == 'unet':
         # 初始化 UNet 模型
         model = unet.UNet(num_classes=config['num_classes'])
+    elif selected == 'utransform':
+        # 初始化 UMamba 模型
+        model = utransform.UTransform(num_classes=config['num_classes'])
 
     # 将模型移动到指定设备上
     model.to(device)
@@ -76,6 +79,10 @@ def train(config):
     # 初始化验证集的最大像素准确率和最小损失
     val_max_pixACC = 0.0
     val_min_loss = 100.0
+
+    # 新增：用于存储最后十轮的最佳模型
+    best_last_model = None
+
     for epoch in range(config['num_epoch']):
         # 记录每个 epoch 的开始时间
         epoch_start = time.time()
@@ -239,12 +246,37 @@ def train(config):
                 np.savetxt(os.path.join(config['save_model']['save_path'], selected+'_best_epoch.txt'),best_epoch)
             
             # 保存最后一次的模型
-            torch.save(model.state_dict(), os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth'))
-            np.savetxt(os.path.join(config['save_model']['save_path'], selected + '_conf_matrix_val_last.txt'), conf_matrix_val, fmt="%d")
+            # 新增：在最后十轮中，保存 OA 和 mIoU 表现最好的模型
+            if epoch >= config['num_epoch'] - 10:
+                current_model_info = {
+                    'epoch': epoch,
+                    'val_pixelAcc': pixelAcc,
+                    'val_mIoU': mIoU.mean(),
+                    'state_dict': model.state_dict().copy(),
+                    'conf_matrix_val': conf_matrix_val.copy()
+                }
+
+                if best_last_model is None:
+                    best_last_model = current_model_info
+                else:
+                    # 比较当前模型和之前的最佳模型，选择 OA + mIoU 更高的
+                    current_score = 0.5*current_model_info['val_pixelAcc'] + current_model_info['val_mIoU']
+                    best_score = 0.5*best_last_model['val_pixelAcc'] + best_last_model['val_mIoU']
+                    if current_score > best_score:
+                        best_last_model = current_model_info
         # 记录验证集的日志信息
         logger.info('VAL ({}) | Loss: {:.5f} | OA {:.5f} |IOU {} |mIoU {:.5f} |class_precision {}| class_recall {} | class_f1 {}|'.format(
             epoch, loss_sum / ((batch_idx + 1) * config['batch_size']),
             pixelAcc, toString(mIoU), mIoU.mean(),toString(class_precision),toString(class_recall),toString(class_f1)))
+        
+        # 训练结束后，保存最后十轮中表现最好的模型
+        if best_last_model is not None:
+            torch.save(best_last_model['state_dict'], 
+                    os.path.join(config['save_model']['save_path'], 
+                    f"{selected}_jx_last.pth"))
+            np.savetxt(os.path.join(config['save_model']['save_path'], 
+                    f"{selected}_conf_matrix_val_last.txt"), 
+                    best_last_model['conf_matrix_val'], fmt="%d")
 
 def toString(IOU):
     # 将 IOU 数组转换为字符串格式

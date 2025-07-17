@@ -3,7 +3,7 @@
     "img_txt": "dataset/test20.txt",
     "train_model": { 
         "select" : 1,
-        "model": ["unetFEGcn","unet"]
+        "model": ["unetFEGcn","unet","utransfrom"]
     },
     "save_model": {
         "save": true,
