@@ -216,7 +216,7 @@ class UTransform(BaseModel):
 if __name__ == "__main__":
     # 初始化模型
     num_classes = 10  # 假设类别数为 10
-    model = UMamba(num_classes=num_classes, in_channels=5)
+    model = UTransform(num_classes=num_classes, in_channels=5)
 
     # 生成一个随机输入
     input_tensor = torch.randn(1, 5, 256, 256)

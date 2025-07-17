@@ -43,13 +43,13 @@ def eval(config):
     elif selected == 'unet':
         # 初始化UNet模型，并指定类别数量
         model = unet.UNet(num_classes=config['num_classes'])
-    elif selected == 'umamba':
-        # 初始化 UMamba 模型
+    elif selected == 'utransform':
+        # 初始化 UTransform 模型
         model = utransform.UTransform(num_classes=config['num_classes'])
 
     # 加载模型的检查点文件
-    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth')
-    # check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_best.pth')
+    # check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_last.pth')
+    check_point = os.path.join(config['save_model']['save_path'], selected + '_jx_best.pth')
     # 定义数据归一化的转换操作
     transform = transforms.Compose(
         [

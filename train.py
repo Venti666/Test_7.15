@@ -4,7 +4,7 @@ import logging
 from tqdm import tqdm
 
 from utils import unet_dataset
-from models import unetFEGcn,unet,utransform
+from models import unetFEGcn,unet,utransform,umamba
 from metrics import eval_metrics
 from utils.losses import CustomNDVILoss  # 导入自定义损失函数
 # from predict import predict
@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 # 设置可见的 CUDA 设备
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def train(config):
     # 训练配置
@@ -33,8 +33,11 @@ def train(config):
         # 初始化 UNet 模型
         model = unet.UNet(num_classes=config['num_classes'])
     elif selected == 'utransform':
-        # 初始化 UMamba 模型
+        # 初始化 UTransform 模型
         model = utransform.UTransform(num_classes=config['num_classes'])
+    elif selected == 'umamba':
+        # 初始化 UTransform 模型
+        model = umamba.UMamba(num_classes=config['num_classes'])
 
     # 将模型移动到指定设备上
     model.to(device)
@@ -245,6 +248,7 @@ def train(config):
                 # 保存最佳 epoch 的信息
                 np.savetxt(os.path.join(config['save_model']['save_path'], selected+'_best_epoch.txt'),best_epoch)
             
+            # 保存最后一次的模型
             # 新增：在最后十轮中，保存 OA 和 mIoU 表现最好的模型
             if epoch >= config['num_epoch'] - 10:
                 current_model_info = {

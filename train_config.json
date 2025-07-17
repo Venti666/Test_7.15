@@ -11,7 +11,7 @@
 
     "train_model": { 
         "select" : 1,
-        "model": ["unetFEGcn","unet","utransfrom"]
+        "model": ["unetFEGcn","unet","utransfrom","umamba"]
     },
     "save_model": {
         "save": true,
