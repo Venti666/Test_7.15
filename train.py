@@ -245,7 +245,6 @@ def train(config):
                 # 保存最佳 epoch 的信息
                 np.savetxt(os.path.join(config['save_model']['save_path'], selected+'_best_epoch.txt'),best_epoch)
             
-            # 保存最后一次的模型
             # 新增：在最后十轮中，保存 OA 和 mIoU 表现最好的模型
             if epoch >= config['num_epoch'] - 10:
                 current_model_info = {
